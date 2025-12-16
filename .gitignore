@@ -1,6 +1,16 @@
 **/target/
-.idea
-*.iml
 *.class
 *Test.java
 **/test/
+# Maven
+**/target/
+target/
+*.log
+# IntelliJ IDEA
+.idea/
+*.iml
+# OS
+.DS_Store
+Thumbs.db
+# Node / 前端（如果以后有）
+node_modules/
