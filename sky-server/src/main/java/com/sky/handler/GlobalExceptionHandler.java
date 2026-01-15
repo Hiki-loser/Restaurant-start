@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
     /**
      * 捕获业务异常
      * @param ex
-     * @return
+     * @return Result
      */
     @ExceptionHandler
     public Result exceptionHandler(BaseException ex){
