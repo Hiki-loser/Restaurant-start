@@ -26,7 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/admin/employee")
 @Slf4j
-@Api("员工登录")
+@Api(value = "员工登录")
 public class EmployeeController {
 
     @Autowired
@@ -37,7 +37,6 @@ public class EmployeeController {
     /**
      * 登录
      *
-     * @param employeeLoginDTO
      * @return Result<EmployeeLoginVO>
      */
 

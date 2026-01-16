@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.DishMapper">
+    <update id="update" parameterType="com.sky.entity.Dish">
+        update dish
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="code != null">code = #{code},</if>
+            <if test="image != null">image = #{image},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="updateUser != null">update_user = #{updateUser},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <!-- 分页查询：根据 name 模糊匹配，可扩展其他筛选条件 -->
+    <select id="pageQuery" parameterType="com.sky.dto.DishPageQueryDTO" resultType="com.sky.entity.Dish">
+        SELECT
+            id,
+            name,
+            category_id AS categoryId,
+            price,
+            code,
+            image,
+            description,
+            status,
+            create_time AS createTime,
+            update_time AS updateTime,
+            create_user AS createUser,
+            update_user AS updateUser
+        FROM dish
+        <where>
+            <if test="name != null and name != ''">
+                AND name LIKE CONCAT('%', #{name}, '%')
+            </if>
+        </where>
+        ORDER BY update_time DESC
+    </select>
+</mapper>

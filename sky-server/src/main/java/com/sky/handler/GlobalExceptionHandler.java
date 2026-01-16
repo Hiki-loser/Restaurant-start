@@ -22,15 +22,15 @@ public class GlobalExceptionHandler {
      * @return Result
      */
     @ExceptionHandler
-    public Result exceptionHandler(BaseException ex){
+    public Result<String> exceptionHandler(BaseException ex){
         log.error("异常信息：{}", ex.getMessage());
         return Result.error( MessageConstant.SERVER_ERROR +ex.getMessage());
     }
 
     @ExceptionHandler
-    public Result exceptionHandler(SQLIntegrityConstraintViolationException ex){
+    public Result<String> exceptionHandler(SQLIntegrityConstraintViolationException ex){
 
-        log.error("异常信息：{}", ex.getMessage());
+        log.error("SQL异常信息：{}", ex.getMessage());
         if (ex.getMessage().contains("Duplicate entry")){
             String[] split = ex.getMessage().split(" ");
             String msg ="用户" + split[2] + "已存在";
