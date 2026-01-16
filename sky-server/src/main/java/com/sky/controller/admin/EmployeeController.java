@@ -68,7 +68,6 @@ public class EmployeeController {
 
     /**
      * 退出
-     *
      * @return
      */
     @PostMapping("/logout")
@@ -79,7 +78,7 @@ public class EmployeeController {
 
     @PostMapping("")
     @ApiOperation("新增员工")
-    public Result addEmployee(@RequestBody EmployeeDTO employeeDTO) {
+    public Result<String> addEmployee(@RequestBody EmployeeDTO employeeDTO) {
         log.info("员工登录:{}", employeeDTO);
 
         employeeService.save(employeeDTO);
@@ -98,6 +97,31 @@ public class EmployeeController {
 
     }
 
+    @PostMapping("/status/{status}")
+    @ApiOperation("员工状态修改")
+    public Result<String> changeStatus(@PathVariable Integer status, @RequestParam Long id){
+        log.info("员工状态修改: {}, {}", status, id);
+        employeeService.startOrStop(status, id);
+        //TODO 修改员工状态
+        return Result.success();
+        }
+
+    @GetMapping("/{id}")
+    @ApiOperation("根据id查询员工信息")
+    public Result<Employee> getById(@PathVariable Long id) {
+        log.info("根据id查询员工信息: {}", id);
+        Employee employee = employeeService.getById(id);
+        return Result.success(employee);
+    }
+
+    @PutMapping
+    @ApiOperation("修改员工信息")
+    public Result<String> updateEmployee(@RequestBody EmployeeDTO employeeDTO) {
+        log.info("修改员工信息: {}", employeeDTO);
+
+        employeeService.update(employeeDTO);
+        return Result.success();
+    }
 }
 
 
