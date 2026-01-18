@@ -2,13 +2,21 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.sky.mapper.DishMapper">
+
+
+    <insert id="insert">
+        insert into dish
+        (name, category_id, price, image, description, status, create_time, update_time, create_user, update_user)
+        values
+        (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{status}, #{createTime}, #{updateTime}, #{createUser}, #{updateUser})
+    </insert>
+
     <update id="update" parameterType="com.sky.entity.Dish">
         update dish
         <set>
             <if test="name != null">name = #{name},</if>
             <if test="categoryId != null">category_id = #{categoryId},</if>
             <if test="price != null">price = #{price},</if>
-            <if test="code != null">code = #{code},</if>
             <if test="image != null">image = #{image},</if>
             <if test="description != null">description = #{description},</if>
             <if test="status != null">status = #{status},</if>
@@ -18,27 +26,37 @@
         where id = #{id}
     </update>
 
-    <!-- 分页查询：根据 name 模糊匹配，可扩展其他筛选条件 -->
-    <select id="pageQuery" parameterType="com.sky.dto.DishPageQueryDTO" resultType="com.sky.entity.Dish">
-        SELECT
-            id,
-            name,
-            category_id AS categoryId,
-            price,
-            code,
-            image,
-            description,
-            status,
-            create_time AS createTime,
-            update_time AS updateTime,
-            create_user AS createUser,
-            update_user AS updateUser
-        FROM dish
+    <delete id="deleteBatch">
+        delete from dish
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="pageQuery" parameterType="com.sky.dto.DishPageQueryDTO" resultType="com.sky.vo.DishVO">
+        select d.*, c.name as categoryName
+        from dish d
+        left outer join category c on d.category_id = c.id
         <where>
             <if test="name != null and name != ''">
-                AND name LIKE CONCAT('%', #{name}, '%')
+                AND d.name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="categoryId != null">
+                AND d.category_id = #{categoryId}
+            </if>
+            <if test="status != null">
+                AND d.status = #{status}
             </if>
         </where>
-        ORDER BY update_time DESC
+        order by d.update_time desc
     </select>
+
+    <!-- 统计某分类下的菜品数量 -->
+    <select id="countByCategoryId" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM dish
+        WHERE category_id = #{categoryId}
+    </select>
+
 </mapper>

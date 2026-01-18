@@ -18,9 +18,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/admin/category")
-@Api(value = "分类管理")
+@Api(tags = "分类管理")
 @Slf4j
 public class CategoryController {
+
     @Autowired
     private CategoryService categoryService;
 
