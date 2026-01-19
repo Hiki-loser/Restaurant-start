@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.UserMapper" >
+
+    <insert id="insert" parameterType="com.sky.entity.User">
+        INSERT INTO user (openid, name, phone, sex, id_number, avatar, create_time)
+        VALUES (#{openid}, #{name}, #{phone}, #{sex}, #{idNumber}, #{avatar}, #{createTime})
+    </insert>
+
+    <select id="getByOpenid" parameterType="java.lang.String" resultType="com.sky.entity.User" >
+        SELECT
+            id,
+            openid,
+            name,
+            phone,
+            sex,
+            id_number AS idNumber,
+            avatar,
+            create_time AS createTime
+        FROM user
+        WHERE openid = #{openid}
+    </select>
+</mapper>

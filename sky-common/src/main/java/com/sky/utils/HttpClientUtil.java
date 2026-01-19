@@ -33,7 +33,7 @@ public class HttpClientUtil {
      * @param paramMap
      * @return
      */
-    public static String doGet(String url,Map<String,String> paramMap){
+    public static String doGet(String url, Map<String, String> paramMap){
         // 创建Httpclient对象
         CloseableHttpClient httpClient = HttpClients.createDefault();
 
@@ -59,6 +59,7 @@ public class HttpClientUtil {
             if(response.getStatusLine().getStatusCode() == 200){
                 result = EntityUtils.toString(response.getEntity(),"UTF-8");
             }
+
         }catch (Exception e){
             e.printStackTrace();
         }finally {
