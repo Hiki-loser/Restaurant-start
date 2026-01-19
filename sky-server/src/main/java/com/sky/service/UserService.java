@@ -2,8 +2,12 @@ package com.sky.service;
 
 
 import com.sky.dto.UserLoginDTO;
+import com.sky.entity.Category;
+import com.sky.entity.ShoppingCart;
 import com.sky.entity.User;
 import com.sky.vo.UserLoginVO;
+
+import java.util.List;
 
 public interface UserService {
 
@@ -13,4 +17,8 @@ public interface UserService {
     User wxLogin(String openid) throws Exception;
 
     String getOpenid(String code);
+
+    Integer getShopStatus();
+
+    List<ShoppingCart> getShoppingCartList();
 }

@@ -11,6 +11,13 @@
         (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{status}, #{createTime}, #{updateTime}, #{createUser}, #{updateUser})
     </insert>
 
+    <insert id="addDish">
+        insert into dish
+        (name, category_id, price, image, description, status, create_time, update_time, create_user, update_user)
+        values
+        (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{status}, #{createTime}, #{updateTime}, #{createUser}, #{updateUser})
+    </insert>
+
     <update id="update" parameterType="com.sky.entity.Dish">
         update dish
         <set>
@@ -57,6 +64,20 @@
         SELECT COUNT(*)
         FROM dish
         WHERE category_id = #{categoryId}
+    </select>
+
+    <select id="list" resultType="com.sky.entity.Dish">
+        select *
+        from dish
+        <where>
+            <if test="categoryId != null">
+                AND category_id = #{categoryId}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+        order by update_time desc
     </select>
 
 </mapper>

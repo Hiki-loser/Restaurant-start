@@ -21,4 +21,29 @@
         FROM user
         WHERE openid = #{openid}
     </select>
+    <select id="getCategoryList" resultType="com.sky.entity.Category">
+        SELECT id,
+               name,
+               type,
+               sort,
+               create_time AS createTime,
+               update_time AS updateTime
+        FROM category
+        ORDER BY sort ASC
+    </select>
+    <select id="getShoppingCartList" resultType="com.sky.entity.ShoppingCart">
+        SELECT id,
+               user_id AS userId,
+               dish_id AS dishId,
+               setmeal_id AS setmealId,
+               name,
+               image,
+               dish_flavor AS dishFlavor,
+               number,
+               amount,
+               create_time AS createTime
+        FROM shopping_cart
+        WHERE user_id = #{userId}
+        ORDER BY create_time ASC
+    </select>
 </mapper>

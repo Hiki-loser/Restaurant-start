@@ -3,6 +3,8 @@ package com.sky.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import com.sky.constant.JwtClaimsConstant;
 import com.sky.dto.UserLoginDTO;
+import com.sky.entity.Category;
+import com.sky.entity.ShoppingCart;
 import com.sky.entity.User;
 import com.sky.exception.LoginFailedException;
 import com.sky.mapper.UserMapper;
@@ -14,10 +16,12 @@ import com.sky.utils.JwtUtil;
 import com.sky.vo.UserLoginVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -25,6 +29,11 @@ import java.util.Map;
 public class UserServiceImpl implements UserService {
     //微信服务接口地址
     public static final String WX_LOGIN = "https://api.weixin.qq.com/sns/jscode2session";
+
+    public static final String KEY = "SHOP_STATUS";
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
     JwtProperties jwtProperties;
@@ -77,6 +86,16 @@ public class UserServiceImpl implements UserService {
         //解析json获取openid
         JSONObject jsonObject = JSONObject.parseObject(json);
         return jsonObject.getString("openid");
+    }
+
+    @Override
+    public Integer getShopStatus() {
+        return (Integer) redisTemplate.opsForValue().get(KEY);
+    }
+
+    @Override
+    public List<ShoppingCart> getShoppingCartList() {
+        return userMapper.getShoppingCartList();
     }
 
 }
