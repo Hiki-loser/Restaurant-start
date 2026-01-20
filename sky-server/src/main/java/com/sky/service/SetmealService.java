@@ -22,5 +22,5 @@ public interface SetmealService {
      */
     List<DishItemVO> getDishItemById(Long id);
 
-    PageResult pageQuery(Integer page, Integer size);
+    PageResult pageQuery(Integer page, Integer size, Integer status);
 }

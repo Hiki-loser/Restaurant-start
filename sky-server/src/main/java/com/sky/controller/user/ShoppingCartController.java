@@ -31,7 +31,6 @@ public class ShoppingCartController {
             key = "'user:' + T(com.sky.context.BaseContext).getCurrentId()"
     )
     public Result<String> add(@RequestBody ShoppingCartDTO shoppingCartDTO) {
-        log.error("【Controller】userId = {}", BaseContext.getCurrentId());
         log.info("add to shoppingCartDTO:{}", shoppingCartDTO);
         shoppingCartService.add(shoppingCartDTO);
         return Result.success("Added to shopping cart successfully");
@@ -61,7 +60,7 @@ public class ShoppingCartController {
         return Result.success("Reduced item quantity in shopping cart successfully");
     }
 
-    @DeleteMapping
+    @DeleteMapping("/clean")
     @ApiOperation("清空购物车")
     @CacheEvict(
             value = "shoppingCartCache",

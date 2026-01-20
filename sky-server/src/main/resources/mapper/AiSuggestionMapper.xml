@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.mapper.AiSuggestionMapper">
+
+    <resultMap id="BaseResultMap" type="com.sky.entity.AiSuggestion">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="biz_type" property="bizType"/>
+        <result column="biz_id" property="bizId"/>
+        <result column="suggestion_type" property="suggestionType"/>
+        <result column="content" property="content"/>
+        <result column="accepted" property="accepted"/>
+        <result column="accepted_by" property="acceptedBy"/>
+        <result column="accepted_at" property="acceptedAt"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.sky.entity.AiSuggestion" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_suggestion (task_id, biz_type, biz_id, suggestion_type, content, accepted, accepted_by, accepted_at, status, create_time)
+        VALUES (#{taskId}, #{bizType}, #{bizId}, #{suggestionType}, #{content}, #{accepted}, #{acceptedBy}, #{acceptedAt}, #{status}, NOW())
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap" parameterType="long">
+        SELECT * FROM ai_suggestion WHERE id = #{id}
+    </select>
+
+    <select id="selectByBiz" resultMap="BaseResultMap">
+        SELECT * FROM ai_suggestion WHERE biz_type = #{bizType} AND biz_id = #{bizId} ORDER BY create_time DESC
+    </select>
+
+    <update id="update" parameterType="com.sky.entity.AiSuggestion">
+        UPDATE ai_suggestion
+        SET task_id = #{taskId}, biz_type = #{bizType}, biz_id = #{bizId}, suggestion_type = #{suggestionType},
+            content = #{content}, accepted = #{accepted}, accepted_by = #{acceptedBy}, accepted_at = #{acceptedAt}, status = #{status}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

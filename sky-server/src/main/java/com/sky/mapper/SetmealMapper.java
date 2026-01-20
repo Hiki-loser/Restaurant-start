@@ -28,9 +28,13 @@ public interface SetmealMapper {
             "where sd.setmeal_id = #{setmealId}")
     List<DishItemVO> getDishItemBySetmealId(Long setmealId);
 
-    Page<Setmeal> pageQuery();
+    Page<Setmeal> pageQuery(Integer status);
 
     List<Setmeal> listByType(Integer type);
 
     Setmeal getById(Long setmealId);
+
+    void insert(Setmeal setmeal);
+
+    void deleteById(Long sid);
 }

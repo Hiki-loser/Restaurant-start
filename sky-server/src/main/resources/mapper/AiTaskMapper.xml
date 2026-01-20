@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.mapper.AiTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.sky.entity.AiTask">
+        <id column="id" property="id" />
+        <result column="biz_type" property="bizType" />
+        <result column="biz_id" property="bizId" />
+        <result column="payload" property="payload" />
+        <result column="status" property="status" />
+        <result column="retries" property="retries" />
+        <result column="response_raw" property="responseRaw" />
+        <result column="result_id" property="resultId" />
+        <result column="last_error" property="lastError" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <insert id="insert" parameterType="com.sky.entity.AiTask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_task (biz_type, biz_id, payload, status, retries, response_raw, result_id, last_error, created_at, updated_at)
+        VALUES (#{bizType}, #{bizId}, #{payload}, #{status}, #{retries}, #{responseRaw}, #{resultId}, #{lastError}, NOW(), NOW())
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap" parameterType="long">
+        SELECT * FROM ai_task WHERE id = #{id}
+    </select>
+
+    <update id="update" parameterType="com.sky.entity.AiTask">
+        UPDATE ai_task
+        SET biz_type = #{bizType}, biz_id = #{bizId}, payload = #{payload}, status = #{status},
+            retries = #{retries}, response_raw = #{responseRaw}, result_id = #{resultId}, last_error = #{lastError}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

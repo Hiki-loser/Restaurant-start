@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.OrderMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        insert into orders (number, status, user_id, address_book_id, order_time, checkout_time, pay_method, pay_status, amount, remark,
+                            phone, address, user_name, consignee, cancel_reason, rejection_reason, cancel_time, estimated_delivery_time,
+                            delivery_status, delivery_time, pack_amount, tableware_number, tableware_status)
+        VALUES
+            (#{number}, #{status}, #{userId}, #{addressBookId}, #{orderTime}, #{checkoutTime}, #{payMethod}, #{payStatus}, #{amount},
+             #{remark}, #{phone}, #{address}, #{userName}, #{consignee}, #{cancelReason}, #{rejectionReason}, #{cancelTime},
+             #{estimatedDeliveryTime}, #{deliveryStatus}, #{deliveryTime}, #{packAmount}, #{tablewareNumber}, #{tablewareStatus})
+    </insert>
+
+    <update id="updateBatch">
+        update orders
+        <foreach collection="ordersList" item="ol" separator=", ">
+            <set>
+                <if test="ol.cancelReason != null and ol.cancelReason!=''">
+                    cancel_reason = #{ol.cancelReason},
+                </if>
+                <if test="ol.rejectionReason != null and ol.rejectionReason!=''">
+                    rejection_reason = #{ol.rejectionReason},
+                </if>
+                <if test="ol.cancelTime != null">
+                    cancel_time = #{ol.cancelTime},
+                </if>
+                <if test="ol.payStatus != null">
+                    pay_status = #{ol.payStatus},
+                </if>
+                <if test="ol.payMethod != null">
+                    pay_method = #{ol.payMethod},
+                </if>
+                <if test="ol.checkoutTime != null">
+                    checkout_time = #{ol.checkoutTime},
+                </if>
+                <if test="ol.status != null">
+                    status = #{ol.status},
+                </if>
+                <if test="ol.deliveryTime != null">
+                    delivery_time = #{ol.deliveryTime}
+                </if>
+            </set>
+        </foreach>
+        where
+        <foreach collection="ordersList" item="ol">
+            id = #{ol.id}
+        </foreach>
+    </update>
+
+</mapper>

@@ -2,6 +2,13 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.sky.mapper.SetmealMapper">
+    <insert id="insert">
+        INSERT INTO setmeal (name, category_id, price, status,  description, image)
+        VALUES (#{name}, #{categoryId}, #{price}, #{status},  #{description}, #{image})
+    </insert>
+    <delete id="deleteById">
+        DELETE FROM setmeal WHERE id = #{id}
+    </delete>
 
     <select id="list" parameterType="Setmeal" resultType="Setmeal">
         select * from setmeal
@@ -23,6 +30,9 @@
         <where>
             <if test="name != null">
                 and name like concat('%',#{name},'%')
+            </if>
+            <if test="status != null">
+                and status = #{status}
             </if>
         </where>
         order by update_time desc

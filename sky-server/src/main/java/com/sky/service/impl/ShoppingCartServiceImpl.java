@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 
 @Slf4j
@@ -38,26 +39,36 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
         Long userId = BaseContext.getCurrentId();
         shoppingCart.setUserId(userId);
         List<ShoppingCart> shoppingCarts = shoppingCartMapper.list(shoppingCart);
-        if(shoppingCarts!=null && !shoppingCarts.isEmpty()){
-            ShoppingCart shoppingCartUpdate = shoppingCarts.get(0);
-            shoppingCartUpdate.setNumber(shoppingCartUpdate.getNumber()+1);
-            shoppingCartMapper.update(shoppingCartUpdate);
-        }else{
-            if(shoppingCartDTO.getDishId()!=null){
+        if(shoppingCart.getDishId()!=null){
+            log.info("Adding dish to shopping cart: dishId={}, userId={}", shoppingCart.getDishId(), userId);
+            if(shoppingCarts!=null && !shoppingCarts.isEmpty()&& Objects.equals(shoppingCarts.get(0).getDishId(), shoppingCart.getDishId())){
+                ShoppingCart shoppingCartUpdate = shoppingCarts.get(0);
+                shoppingCartUpdate.setNumber(shoppingCartUpdate.getNumber() + 1);
+                shoppingCartMapper.update(shoppingCartUpdate);
+            }else{
                 Dish dish = dishMapper.getById(shoppingCartDTO.getDishId());
                 shoppingCart.setName(dish.getName());
                 shoppingCart.setImage(dish.getImage());
                 shoppingCart.setAmount(dish.getPrice());
+                shoppingCart.setCreateTime(LocalDateTime.now());
+                shoppingCart.setNumber(1);
+                shoppingCartMapper.insert(shoppingCart);
+            }
+        }else{
+            log.info("Adding setmeal to shopping cart: setmealId={}, userId={}", shoppingCart.getSetmealId(), userId);
+            if(shoppingCarts!=null && !shoppingCarts.isEmpty()&& Objects.equals(shoppingCarts.get(0).getSetmealId(), shoppingCart.getSetmealId())){
+                ShoppingCart shoppingCartUpdate = shoppingCarts.get(0);
+                shoppingCartUpdate.setNumber(shoppingCartUpdate.getNumber() + 1);
+                shoppingCartMapper.update(shoppingCartUpdate);
             }else{
-                //套餐
                 Setmeal setmeal = setmealMapper.getById(shoppingCartDTO.getSetmealId());
                 shoppingCart.setName(setmeal.getName());
                 shoppingCart.setImage(setmeal.getImage());
                 shoppingCart.setAmount(setmeal.getPrice());
+                shoppingCart.setCreateTime(LocalDateTime.now());
+                shoppingCart.setNumber(1);
+                shoppingCartMapper.insert(shoppingCart);
             }
-            shoppingCart.setCreateTime(LocalDateTime.now());
-            shoppingCart.setNumber(1);
-            shoppingCartMapper.insert(shoppingCart);
         }
     }
 

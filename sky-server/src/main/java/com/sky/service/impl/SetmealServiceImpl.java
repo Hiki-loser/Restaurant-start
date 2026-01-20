@@ -34,14 +34,12 @@ public class SetmealServiceImpl implements SetmealService {
      */
     @Override
     public List<Setmeal> list(Setmeal setmeal) {
-        List<Setmeal> list = setmealMapper.list(setmeal);
-        return list;
+        return setmealMapper.list(setmeal);
     }
 
     @Override
     public List<Setmeal> list(Integer type) {
-        List<Setmeal> list = setmealMapper.listByType(type);
-        return list;
+        return setmealMapper.listByType(type);
     }
 
     /**
@@ -49,14 +47,15 @@ public class SetmealServiceImpl implements SetmealService {
      * @param id
      * @return
      */
+    @Override
     public List<DishItemVO> getDishItemById(Long id) {
         return setmealMapper.getDishItemBySetmealId(id);
     }
 
     @Override
-    public PageResult pageQuery(Integer page, Integer size) {
+    public PageResult pageQuery(Integer page, Integer size, Integer status) {
         PageHelper.startPage(page, size);
-        Page<Setmeal> setmeals = setmealMapper.pageQuery();
+        Page<Setmeal> setmeals = setmealMapper.pageQuery(Integer.valueOf(status));
         return new PageResult(setmeals.getTotal(), setmeals.getResult());
     }
 
