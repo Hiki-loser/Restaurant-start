@@ -3,17 +3,17 @@ package com.sky.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.ValidationMessage;
+import com.sky.context.BaseContext;
 import com.sky.entity.AiSuggestion;
 import com.sky.entity.AiTask;
+import com.sky.mapper.*;
+import com.sky.service.AiService;
+import com.sky.utils.AiRequestBuilder;
+import com.sky.utils.JsonSchemaValidator;
 import com.sky.entity.Setmeal;
 import com.sky.entity.SetmealDish;
-import com.sky.mapper.AiSuggestionMapper;
-import com.sky.mapper.AiTaskMapper;
-import com.sky.mapper.OrderDetailMapper;
-import com.sky.mapper.SetmealDishMapper;
-import com.sky.mapper.SetmealMapper;
-import com.sky.service.AiService;
-import com.sky.utils.AiHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +23,24 @@ import java.math.BigDecimal;
 import java.util.*;
 
 /**
- * AiService 实现（核心逻辑）
- *
- * 说明：部分 Mapper/实体请使用你已有的实现。我只写 service 逻辑，调用你现成的 mapper。
+ * 说明：
+ * - 使用 DeepSeek style 的 response_format=json_object，返回 choices[0].message.content 为严格 JSON（按 schema）
+ * - 校验 JSON 是否满足 schema（resources/schemas/suggestion_schema.json）
  */
 @Service
 public class AiServiceImpl implements AiService {
+
+    @Value("${sky.ai.api-url}")
+    private String aiApiUrl;
+
+    @Value("${sky.ai.api-key}")
+    private String aiApiKey;
+
+    @Value("${sky.ai.model}")
+    private String aiModel;
+
+    @Resource
+    private OrderDetailMapper orderDetailMapper;
 
     @Resource
     private AiTaskMapper aiTaskMapper;
@@ -37,38 +49,165 @@ public class AiServiceImpl implements AiService {
     private AiSuggestionMapper aiSuggestionMapper;
 
     @Resource
-    private OrderDetailMapper orderDetailMapper; // 读取 order_detail 信息的 mapper（你已有）
-
-    @Resource
     private SetmealMapper setmealMapper;
 
     @Resource
     private SetmealDishMapper setmealDishMapper;
 
-    @Value("${sky.ai.api-url}")
-    private String aiApiUrl;
+    @Resource
+    private DishMapper dishMapper; // optional: for validation of dish existence
 
-    @Value("${sky.ai.api-key}")
-    private String aiApiKey;
+    @Resource
+    private OrderMapper orderMapper;
 
-    @Value("${sky.ai.model:gpt-5-thinking-mini}")
-    private String aiModel;
+    private static final ObjectMapper JACKSON = new ObjectMapper();
+    private final JsonSchemaValidator schemaValidator;
 
-    @Override
-    public Long createTaskForOrder(Long orderId, Long operatorId) {
-        AiTask t = new AiTask();
-        t.setBizType("ORDER_SUMMARY");
-        t.setBizId(orderId);
-        t.setPayload("{}");
-        t.setStatus("PENDING");
-        t.setRetries(0);
-        aiTaskMapper.insert(t);
-        return t.getId();
+    public AiServiceImpl() throws Exception {
+        // 加载 schema（resources/schemas/suggestion_schema.json）
+        this.schemaValidator = JsonSchemaValidator.fromResource("schemas/suggestion_schema.json");
     }
 
     @Override
-    public List<AiSuggestion> listSuggestions(String bizType, Long bizId) {
-        return aiSuggestionMapper.selectByBiz(bizType, bizId);
+    public AiTask generateSuggestions( ) throws Exception {
+        Long userId = BaseContext.getCurrentId();
+        List<Long> orderIds = orderMapper.getOrderIds();
+        // 1. 构建订单摘要（聚合菜品数量）
+        Map<Long, Integer> dishCount = new LinkedHashMap<>();
+        for (Long orderId : orderIds) {
+            List<Map<String, Object>> details = orderDetailMapper.selectByOrderId(orderId);
+            if (details == null) continue;
+            for (Map<String, Object> d : details) {
+                Number dishIdNum = (Number) d.get("dish_id");
+                if (dishIdNum == null) continue;
+                Long dishId = dishIdNum.longValue();
+                Integer num = (Integer) d.getOrDefault("number", 1);
+                dishCount.put(dishId, dishCount.getOrDefault(dishId, 0) + num);
+            }
+        }
+
+        // 2. 构造 user prompt 文本
+        StringBuilder userPrompt = new StringBuilder("请根据以下订单汇总生成套餐建议（输出严格遵循 JSON schema）：\n");
+        for (Map.Entry<Long, Integer> e : dishCount.entrySet()) {
+            Long dishId = e.getKey();
+            Integer qty = e.getValue();
+            String dishName = dishMapper == null ? ("dish#" + dishId) : dishMapper.selectNameById(dishId); // 需要你实现 selectNameById 方法
+            userPrompt.append(String.format("- %s (ID:%d) 数量: %d\n", dishName == null ? ("dish#" + dishId) : dishName, dishId, qty));
+        }
+        userPrompt.append("\n请输出 JSON 格式，顶级对象为 {\"suggestions\": [...] }，每个建议包含 setmealName, dishIds, quantity, totalPrice, note。");
+
+        // 3. 系统提示（说明 schema） - 附带示例
+        String systemPrompt = "你是餐厅菜单优化助手。请严格输出 JSON，不要输出任何多余文本。返回格式示例：\n"
+                + "{\n  \"suggestions\": [\n    {\"setmealName\": \"示例套餐\", \"dishIds\": [3,5], \"quantity\":1, \"totalPrice\": 88.0, \"note\":\"理由\"}\n  ]\n}";
+
+        // 4. 保存初始任务（payload 可保存订单摘要）
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("prompt", userPrompt.toString());
+
+        AiTask task = new AiTask();
+        task.setUserId(userId);
+        task.setOrderIds(JACKSON.writeValueAsString(orderIds));
+        task.setStatus("PENDING");
+        task.setPayload(JACKSON.writeValueAsString(payload));
+        aiTaskMapper.insert(task);
+
+        // 5. 调用 DeepSeek API
+        JSONObject req = AiRequestBuilder.buildDeepseekRequest(systemPrompt, userPrompt.toString(), aiModel);
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Authorization", "Bearer " + aiApiKey);
+        headers.put("Content-Type", "application/json");
+
+        String resp = null;
+        try {
+            resp = com.sky.utils.AiHttpClient.postJsonWithHeaders(aiApiUrl, req.toJSONString(), headers);
+            // 保存原始 response
+            task.setResponseRaw(resp);
+            task.setStatus("SUCCESS");
+            aiTaskMapper.update(task);
+        } catch (Exception ex) {
+            task.setStatus("FAILED");
+            aiTaskMapper.update(task);
+            throw ex;
+        }
+
+        // 6. 解析 DeepSeek 返回的 JSON（通常在 choices[0].message.content）
+        String contentJson = extractContentFromAiRaw(resp);
+
+        // 7. 校验 JSON
+        Set<ValidationMessage> errors = schemaValidator.validate(contentJson);
+        boolean valid = errors == null || errors.isEmpty();
+
+        // 8. 如果不合法，插入一条 suggestion 标注 REVIEW_NEEDED 并返回
+        List<AiSuggestion> saved = new ArrayList<>();
+        if (!valid) {
+            AiSuggestion s = new AiSuggestion();
+            s.setTaskId(task.getId());
+            s.setSuggestionType("SETMEAL_PROPOSAL");
+            s.setSummary("AI returned invalid suggestion (schema mismatch)");
+            s.setSuggestionJson(contentJson);
+            s.setAccepted(false);
+            s.setStatus("REVIEW_NEEDED");
+            aiSuggestionMapper.insert(s);
+            saved.add(s);
+        } else {
+            // 9. 解析 suggestions 数组并逐条入库
+            JSONObject parsed = JSON.parseObject(contentJson);
+            JSONArray suggestions = parsed.getJSONArray("suggestions");
+            for (int i = 0; i < suggestions.size(); i++) {
+                JSONObject item = suggestions.getJSONObject(i);
+                AiSuggestion s = new AiSuggestion();
+                s.setTaskId(task.getId());
+                s.setSuggestionType("SETMEAL_PROPOSAL");
+                s.setSummary(item.getString("setmealName"));
+                s.setSuggestionJson(item.toJSONString());
+                s.setAccepted(false);
+                s.setStatus("NEW");
+                aiSuggestionMapper.insert(s);
+                saved.add(s);
+            }
+        }
+        task.setSuggestions(saved);
+        return task;
+    }
+
+    /**
+     * 尝试从 AI raw resp 中抽取严格 JSON content。支持 DeepSeek/OpenAI 风格：
+     * - root.choices[0].message.content
+     * - root.choices[0].text
+     * - 若 root 本身是 JSON（直接返回）
+     */
+    private String extractContentFromAiRaw(String raw) {
+        if (raw == null) return null;
+        try {
+            JSONObject root = JSON.parseObject(raw);
+            if (root.containsKey("choices")) {
+                JSONArray choices = root.getJSONArray("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    JSONObject first = choices.getJSONObject(0);
+                    if (first.containsKey("message")) {
+                        JSONObject message = first.getJSONObject("message");
+                        if (message != null && message.containsKey("content")) {
+                            return message.getString("content");
+                        }
+                    } else if (first.containsKey("text")) {
+                        return first.getString("text");
+                    }
+                }
+            }
+            if (root.containsKey("content")) {
+                return root.getString("content");
+            }
+            // fallback: return whole raw
+            return raw;
+        } catch (Exception ex) {
+            // raw 不一定是 json，直接返回
+            return raw;
+        }
+    }
+
+    @Override
+    public List<AiSuggestion> listSuggestions(Long taskId) {
+        return aiSuggestionMapper.selectByTaskId(taskId);
     }
 
     @Override
@@ -76,191 +215,75 @@ public class AiServiceImpl implements AiService {
         return aiSuggestionMapper.selectById(suggestionId);
     }
 
+    /**
+     * 采纳建议：解析 suggestion_json（单条建议 json），创建 setmeal 与 setmeal_dish
+     * 并将 suggestion 标为 accepted（带事务）
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void acceptSuggestion(Long suggestionId, Long operatorId, boolean autoCreateSetmeal, boolean autoDeleteUnused) throws Exception {
+    public void acceptSuggestion(Long suggestionId) throws Exception {
+        Long operatorId = BaseContext.getCurrentId();
         AiSuggestion s = aiSuggestionMapper.selectById(suggestionId);
         if (s == null) throw new IllegalArgumentException("suggestion not found");
         if (Boolean.TRUE.equals(s.getAccepted())) throw new IllegalStateException("already accepted");
 
-        JSONObject content = JSON.parseObject(s.getContent());
-        // content 可能包含 keys: "setmeal_proposals":[], "delete_setmeals":[], "procurements":[]
-        if (autoCreateSetmeal && content.containsKey("setmeal_proposals")) {
-            JSONArray proposals = content.getJSONArray("setmeal_proposals");
-            for (int i = 0; i < proposals.size(); i++) {
-                JSONObject p = proposals.getJSONObject(i);
-                // Create Setmeal
-                Setmeal setmeal = new Setmeal();
-                setmeal.setName(p.getString("title"));
+        // parse suggestionJson (EXPECT single suggestion object)
+        JSONObject item = JSON.parseObject(s.getSuggestionJson());
+        String setmealName = item.getString("setmealName");
+        JSONArray dishIds = item.getJSONArray("dishIds");
+        Integer quantity = item.getInteger("quantity");
+        Double totalPrice = item.getDouble("totalPrice");
 
-                setmeal.setPrice( p.getDouble("suggested_price") != null?
-                        BigDecimal.valueOf(p.getDouble("suggested_price")) :
-                        BigDecimal.ZERO);
-
-                setmeal.setDescription(p.getString("rationale"));
-                setmeal.setStatus(1);
-                setmealMapper.insert(setmeal);
-
-                // Create setmeal_dish entries
-                JSONArray items = p.getJSONArray("items");
-                if (items != null) {
-                    for (int j = 0; j < items.size(); j++) {
-                        JSONObject it = items.getJSONObject(j);
-                        SetmealDish sd = new SetmealDish();
-                        sd.setSetmealId(setmeal.getId());
-                        sd.setDishId(it.getLong("dish_id"));
-                        sd.setName(it.getString("name"));
-
-                        setmeal.setPrice( p.getDouble("suggested_price") != null?
-                                BigDecimal.valueOf(p.getDouble("suggested_price")) :
-                                BigDecimal.ZERO);
-
-                        sd.setCopies(it.getInteger("copies") == null ? 1 : it.getInteger("copies"));
-                        setmealDishMapper.insert(sd);
-                    }
-                }
-            }
+        // 幂等：避免重复创建同名套餐
+        Setmeal exists = setmealMapper.selectByName(setmealName);
+        Long setmealId;
+        if (exists != null) {
+            setmealId = exists.getId();
+        } else {
+            // create setmeal
+            Setmeal setmeal = new Setmeal();
+            setmeal.setName(setmealName);
+            setmeal.setDescription(item.getString("note"));
+            setmeal.setPrice(totalPrice == null ? BigDecimal.ZERO : BigDecimal.valueOf(totalPrice));
+            setmeal.setStatus(1);
+            // 你可能需要设置 category_id，create_user 等字段（这里置默认）
+            setmeal.setCategoryId(1L);
+            setmealMapper.insert(setmeal);
+            setmealId = setmeal.getId();
         }
 
-        if (autoDeleteUnused && content.containsKey("delete_setmeals")) {
-            // 内容为要删除的 setmeal id list
-            JSONArray del = content.getJSONArray("delete_setmeals");
-            for (int i = 0; i < del.size(); i++) {
-                Long sid = del.getLong(i);
-                // 这里调用 SetmealMapper 的删除方法（假定存在 deleteById）
-                try {
-                    setmealMapper.deleteById(sid);
-                } catch (Exception ex) {
-                    // 若没有 delete 方法，请在 mapper 中实现 deleteById
-                    // 为了幂等性，这里 catch 异常并继续处理
+        // create setmeal_dish entries (delete existing mapping for this setmeal? here append but check duplicates)
+        for (int i = 0; i < dishIds.size(); i++) {
+            Long dishId = dishIds.getLong(i);
+            // optional validation: dish exists
+            if (dishMapper != null && dishMapper.selectById(dishId) == null) {
+                // 如果菜品不存在，跳过或抛异常（这里选择跳过）
+                continue;
+            }
+            // 检查是否已存在组合记录（防重复）
+            boolean existsRel = setmealDishMapper.existsBySetmealIdAndDishId(setmealId, dishId);
+            if (existsRel) continue;
+
+            SetmealDish sd = new SetmealDish();
+            sd.setSetmealId(setmealId);
+            sd.setDishId(dishId);
+            // 尝试填充 name 和 price（冗余字段），从 dish 表读取
+            if (dishMapper != null) {
+                com.sky.entity.Dish d = dishMapper.selectById(dishId);
+                if (d != null) {
+                    sd.setName(d.getName());
+                    sd.setPrice(d.getPrice());
                 }
             }
+            sd.setCopies(quantity == null ? 1 : quantity);
+            setmealDishMapper.insert(sd);
         }
 
-        // 标记 accepted
+        // 标记 suggestion 为 accepted
         s.setAccepted(true);
         s.setAcceptedBy(operatorId);
         s.setAcceptedAt(new Date());
         s.setStatus("APPLIED");
         aiSuggestionMapper.update(s);
-    }
-
-    @Override
-    public void runTaskNow(Long taskId) {
-        AiTask task = aiTaskMapper.selectById(taskId);
-        if (task == null) throw new IllegalArgumentException("task not found");
-
-        // 读取订单详情并构造 payload
-        Long orderId = task.getBizId();
-        List<Map<String, Object>> details = orderDetailMapper.selectByOrderId(orderId); // 你已有方法或实现
-        JSONObject payload = new JSONObject();
-        payload.put("taskId", taskId);
-        payload.put("orderId", orderId);
-        payload.put("model", aiModel);
-        payload.put("items", details);
-
-        // constraints 可以从配置中取或硬编码
-        JSONObject constraints = new JSONObject();
-        constraints.put("min_margin", 0.20);
-        constraints.put("max_items_in_setmeal", 4);
-        payload.put("constraints", constraints);
-
-        // Build prompt wrapper per AI API expectation
-        JSONObject requestJson = buildAiRequest(payload);
-
-        try {
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Authorization", "Bearer " + aiApiKey);
-            headers.put("Content-Type", "application/json");
-
-            String resp = AiHttpClient.postJsonWithHeaders(aiApiUrl, requestJson.toJSONString(), headers);
-            // 保存响应
-            task.setResponseRaw(resp);
-            task.setStatus("SUCCESS");
-            aiTaskMapper.update(task);
-
-            // 尝试解析并保存 suggestion(s)
-            parseAndSaveSuggestions(task.getId(), task.getBizType(), task.getBizId(), resp);
-
-        } catch (Exception ex) {
-            task.setStatus("FAILED");
-            task.setLastError(ex.getMessage());
-            task.setRetries(task.getRetries() == null ? 1 : task.getRetries() + 1);
-            aiTaskMapper.update(task);
-        }
-    }
-
-    private JSONObject buildAiRequest(JSONObject payload) {
-        // 根据你实际对接的 AI API 格式调整。下面构造一个通用 wrapper：
-        JSONObject req = new JSONObject();
-        req.put("model", aiModel);
-
-        // We use single prompt approach: instruct model to output strict JSON schema (see guidance)
-        String system = "You are an assistant for restaurant menu optimization. OUTPUT MUST be valid JSON following the schema provided. DO NOT output any explanation.";
-        String user = "INPUT_PAYLOAD: " + payload.toJSONString();
-
-        JSONArray messages = new JSONArray();
-        JSONObject s = new JSONObject();
-        s.put("role", "system"); s.put("content", system);
-        JSONObject u = new JSONObject();
-        u.put("role", "user"); u.put("content", user);
-        messages.add(s); messages.add(u);
-
-        req.put("messages", messages);
-        // temperature/other params:
-        req.put("temperature", 0.2);
-        req.put("max_tokens", 1500);
-        return req;
-    }
-
-    /**
-     * 简单解析 AI 返回，保存 ai_suggestion（仅示例，实际需严格校验 JSON Schema）
-     */
-    private void parseAndSaveSuggestions(Long taskId, String bizType, Long bizId, String aiRaw) {
-        if (aiRaw == null) return;
-        try {
-            JSONObject root = JSON.parseObject(aiRaw);
-            // 若你的 AI 调用返回在 choices[0].message.content 中，请根据返回格式调整这里的解析
-            // 我们尝试几种常见的路径：
-            String contentJson = null;
-            if (root.containsKey("choices")) {
-                JSONArray choices = root.getJSONArray("choices");
-                if (choices != null && !choices.isEmpty()) {
-                    JSONObject first = choices.getJSONObject(0);
-                    if (first.containsKey("message")) {
-                        contentJson = first.getJSONObject("message").getString("content");
-                    } else if (first.containsKey("text")) {
-                        contentJson = first.getString("text");
-                    }
-                }
-            } else if (root.containsKey("content")) {
-                contentJson = root.getString("content");
-            } else {
-                contentJson = aiRaw;
-            }
-
-            // 强制期望 contentJson 为严格 JSON（包含 setmeal_proposals 等）
-            JSONObject parsed = JSON.parseObject(contentJson);
-
-            AiSuggestion s = new AiSuggestion();
-            s.setTaskId(taskId);
-            s.setBizType(bizType == null ? "ORDER_SUMMARY" : bizType);
-            s.setBizId(bizId);
-            s.setSuggestionType(parsed.containsKey("setmeal_proposals") ? "SETMEAL_PROPOSAL" : "GENERAL");
-            s.setContent(parsed.toJSONString());
-            s.setAccepted(false);
-            s.setStatus("NEW");
-            aiSuggestionMapper.insert(s);
-
-            // 更新 task 的 result_id
-            AiTask t = new AiTask();
-            t.setId(taskId);
-            t.setResultId(s.getId());
-            aiTaskMapper.update(t);
-
-        } catch (Exception ex) {
-            // 若解析失败则记录原始 response（上一段已保存），并让人工复核
-            // 这里不抛出异常
-        }
     }
 }

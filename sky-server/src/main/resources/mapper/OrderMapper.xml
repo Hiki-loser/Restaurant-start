@@ -48,5 +48,8 @@
             id = #{ol.id}
         </foreach>
     </update>
+    <select id="getOrderIds" resultType="java.lang.Long">
+        select id from orders
+    </select>
 
 </mapper>

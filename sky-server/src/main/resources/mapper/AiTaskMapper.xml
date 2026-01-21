@@ -1,36 +1,69 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
 <mapper namespace="com.sky.mapper.AiTaskMapper">
 
-    <resultMap id="BaseResultMap" type="com.sky.entity.AiTask">
-        <id column="id" property="id" />
-        <result column="biz_type" property="bizType" />
-        <result column="biz_id" property="bizId" />
-        <result column="payload" property="payload" />
-        <result column="status" property="status" />
-        <result column="retries" property="retries" />
-        <result column="response_raw" property="responseRaw" />
-        <result column="result_id" property="resultId" />
-        <result column="last_error" property="lastError" />
-        <result column="created_at" property="createdAt" />
-        <result column="updated_at" property="updatedAt" />
+    <sql id="Base_Columns">
+        id, user_id, order_ids, status, payload, response_raw, create_time, update_time
+    </sql>
+    <resultMap id="AiTaskResultMap" type="com.sky.entity.AiTask">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="order_ids" property="orderIds" jdbcType="LONGVARCHAR"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="payload" property="payload" jdbcType="LONGVARCHAR"/>
+        <result column="response_raw" property="responseRaw" jdbcType="LONGVARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.sky.entity.AiTask" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO ai_task (biz_type, biz_id, payload, status, retries, response_raw, result_id, last_error, created_at, updated_at)
-        VALUES (#{bizType}, #{bizId}, #{payload}, #{status}, #{retries}, #{responseRaw}, #{resultId}, #{lastError}, NOW(), NOW())
-    </insert>
 
-    <select id="selectById" resultMap="BaseResultMap" parameterType="long">
-        SELECT * FROM ai_task WHERE id = #{id}
-    </select>
+
+    <insert id="insert" parameterType="com.sky.entity.AiTask" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO ai_task (user_id, order_ids, status, payload, response_raw, create_time, update_time)
+        VALUES (
+                   #{userId,jdbcType=BIGINT},
+                   #{orderIds,jdbcType=LONGVARCHAR},
+                   #{status,jdbcType=VARCHAR},
+                   #{payload,jdbcType=LONGVARCHAR},
+                   #{responseRaw,jdbcType=LONGVARCHAR},
+                   NOW(),
+                   NOW()
+               )
+    </insert>
 
     <update id="update" parameterType="com.sky.entity.AiTask">
         UPDATE ai_task
-        SET biz_type = #{bizType}, biz_id = #{bizId}, payload = #{payload}, status = #{status},
-            retries = #{retries}, response_raw = #{responseRaw}, result_id = #{resultId}, last_error = #{lastError}, updated_at = NOW()
-        WHERE id = #{id}
+        <set>
+            <if test="userId != null">user_id = #{userId,jdbcType=BIGINT},</if>
+            <if test="orderIds != null">order_ids = #{orderIds,jdbcType=LONGVARCHAR},</if>
+            <if test="status != null">status = #{status,jdbcType=VARCHAR},</if>
+            <if test="payload != null">payload = #{payload,jdbcType=LONGVARCHAR},</if>
+            <if test="responseRaw != null">response_raw = #{responseRaw,jdbcType=LONGVARCHAR},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id,jdbcType=BIGINT}
     </update>
+
+    <select id="selectById" resultMap="AiTaskResultMap" parameterType="long">
+        SELECT <include refid="Base_Columns" /> FROM ai_task WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="AiTaskResultMap" parameterType="long">
+        SELECT <include refid="Base_Columns" /> FROM ai_task
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByStatus" resultMap="AiTaskResultMap" parameterType="string">
+        SELECT <include refid="Base_Columns" /> FROM ai_task
+        WHERE status = #{status}
+        ORDER BY create_time DESC
+    </select>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM ai_task WHERE id = #{id}
+    </delete>
 
 </mapper>

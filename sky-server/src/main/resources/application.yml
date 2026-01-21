@@ -62,7 +62,7 @@ sky:
   ai:
     api-url: ${SKY_AI_API_URL}
     api-key: ${SKY_AI_API_KEY}
-    model: ${SKY_AI_MODEL:gpt-5-thinking-mini}
+    model: ${SKY_AI_MODEL:deepseek-chat}
 
 
 

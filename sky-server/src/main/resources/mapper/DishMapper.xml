@@ -79,5 +79,15 @@
         </where>
         order by update_time desc
     </select>
+    <select id="selectNameById" resultType="java.lang.String">
+        select name
+        from dish
+        where id = #{id}
+    </select>
+    <select id="selectById" resultType="com.sky.entity.Dish">
+        select *
+        from dish
+        where id = #{id}
+    </select>
 
 </mapper>

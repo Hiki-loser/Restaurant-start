@@ -1,54 +1,67 @@
-package com.sky.constroller.admin;
+package com.sky.controller.admin;
 
 import com.sky.entity.AiSuggestion;
-import com.sky.result.Result;
+import com.sky.entity.AiTask;
 import com.sky.service.AiService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * AI 后台管理接口（前端只需调用查看建议并点击采纳）
+ * AI 后台管理接口（批量发送订单生成建议 → 列表 → 采纳）
  */
 @RestController
 @RequestMapping("/admin/ai")
+@Api(tags = "AI 后台管理接口")
 public class AiAdminController {
 
     @Autowired
     private AiService aiService;
 
-    @PostMapping("/tasks/orders/{orderId}")
-    public Result<Long> createOrderTask(@PathVariable Long orderId, @RequestParam(required = false) Long operatorId) {
-        Long id = aiService.createTaskForOrder(orderId, operatorId);
-        return Result.success(id);
+    /**
+     * 批量生成套餐建议（一次性为多个订单生成建议）
+     * 请求 body: [orderId1, orderId2, ...]
+     */
+    @PostMapping("/generate")
+    @ApiOperation("批量生成套餐建议")
+    public AiTask generateForOrders() throws Exception {
+
+        return aiService.generateSuggestions();
+
     }
 
-    @PostMapping("/tasks/{taskId}/run")
-    public Result<String> runTaskNow(@PathVariable Long taskId) {
-        aiService.runTaskNow(taskId);
-        return Result.success("started");
+    /**
+     * 列出某任务下的建议
+     */
+    @GetMapping("/tasks/{taskId}/suggestions")
+    @ApiOperation("列出某任务下的建议")
+    public List<AiSuggestion> listSuggestions(@PathVariable Long taskId) {
+        return aiService.listSuggestions(taskId);
     }
 
-    @GetMapping("/suggestions")
-    public Result<List<AiSuggestion>> listSuggestions(@RequestParam String bizType, @RequestParam Long bizId) {
-        return Result.success(aiService.listSuggestions(bizType, bizId));
-    }
-
+    /**
+     * 获取单条建议详情
+     */
     @GetMapping("/suggestions/{id}")
-    public Result<AiSuggestion> getSuggestion(@PathVariable Long id) {
-        return Result.success(aiService.getSuggestion(id));
+    @ApiOperation("获取单条建议详情")
+    public AiSuggestion getSuggestion(@PathVariable Long id) {
+        return aiService.getSuggestion(id);
     }
 
+    /**
+     * 采纳一条建议（operatorId 为当前操作者）
+     */
     @PostMapping("/suggestions/{id}/accept")
-    public Result<String> acceptSuggestion(@PathVariable Long id, @RequestParam Long operatorId,
-                                           @RequestParam(defaultValue = "true") boolean autoCreateSetmeal,
-                                           @RequestParam(defaultValue = "false") boolean autoDeleteUnused) {
+    @ApiOperation("采纳一条建议")
+    public String accept(@PathVariable Long id) {
         try {
-            aiService.acceptSuggestion(id, operatorId, autoCreateSetmeal, autoDeleteUnused);
-            return Result.success("applied");
+            aiService.acceptSuggestion(id);
+            return "applied";
         } catch (Exception ex) {
-            return Result.error(ex.getMessage());
+            return "error: " + ex.getMessage();
         }
     }
 }

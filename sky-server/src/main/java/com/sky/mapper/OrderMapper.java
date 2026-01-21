@@ -22,4 +22,5 @@ public interface OrderMapper {
 
     void updateBatch(List<Orders> ordersList);
 
+    List<Long> getOrderIds();
 }

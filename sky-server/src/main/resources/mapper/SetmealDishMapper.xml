@@ -18,6 +18,13 @@
         VALUES (#{setmealId}, #{dishId}, #{name}, #{price}, #{copies})
     </insert>
 
+    <select id="existsBySetmealIdAndDishId" resultType="java.lang.Boolean">
+        SELECT COUNT(1) > 0
+        FROM setmeal_dish
+        WHERE setmeal_id = #{setmealId}
+          AND dish_id = #{dishId}
+    </select>
+
     <!-- 如需批量插入（效率更高），可参考下面注释代码并按需启用
     <insert id="insertBatch" parameterType="java.util.List">
       INSERT INTO setmeal_dish (setmeal_id, dish_id, name, price, copies)

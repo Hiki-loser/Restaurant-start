@@ -28,4 +28,8 @@ public interface DishMapper {
     List<Dish> list(Dish dish);
 
     void addDish(Dish dish);
+
+    String selectNameById(Long dishId);
+
+    Dish selectById(Long dishId);
 }

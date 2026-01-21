@@ -22,7 +22,9 @@ public class SetmealController {
     private SetmealService setmealService;
 
     @GetMapping("/page")
-    public Result<PageResult> page(@RequestParam Integer page, @RequestParam Integer size, @RequestParam Integer status) {
+    public Result<PageResult> page(@RequestParam("page") Integer page,
+                                   @RequestParam("pageSize") Integer size,
+                                   @RequestParam(value = "status",defaultValue = "1") Integer status) {
         log.info("套餐分页查询：page={},size={},status={}", page, size, status);
         return Result.success(setmealService.pageQuery(page, size, status));
     }

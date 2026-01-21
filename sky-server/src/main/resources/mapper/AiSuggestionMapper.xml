@@ -1,40 +1,81 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
 <mapper namespace="com.sky.mapper.AiSuggestionMapper">
 
-    <resultMap id="BaseResultMap" type="com.sky.entity.AiSuggestion">
-        <id column="id" property="id"/>
-        <result column="task_id" property="taskId"/>
-        <result column="biz_type" property="bizType"/>
-        <result column="biz_id" property="bizId"/>
-        <result column="suggestion_type" property="suggestionType"/>
-        <result column="content" property="content"/>
-        <result column="accepted" property="accepted"/>
-        <result column="accepted_by" property="acceptedBy"/>
-        <result column="accepted_at" property="acceptedAt"/>
-        <result column="status" property="status"/>
-        <result column="create_time" property="createTime"/>
+    <resultMap id="AiSuggestionResultMap" type="com.sky.entity.AiSuggestion">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="task_id" property="taskId" jdbcType="BIGINT"/>
+        <result column="suggestion_type" property="suggestionType" jdbcType="VARCHAR"/>
+        <result column="summary" property="summary" jdbcType="VARCHAR"/>
+        <result column="suggestion_json" property="suggestionJson" jdbcType="LONGVARCHAR"/>
+        <result column="accepted" property="accepted" jdbcType="TINYINT"/>
+        <result column="accepted_by" property="acceptedBy" jdbcType="BIGINT"/>
+        <result column="accepted_at" property="acceptedAt" jdbcType="TIMESTAMP"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.sky.entity.AiSuggestion" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO ai_suggestion (task_id, biz_type, biz_id, suggestion_type, content, accepted, accepted_by, accepted_at, status, create_time)
-        VALUES (#{taskId}, #{bizType}, #{bizId}, #{suggestionType}, #{content}, #{accepted}, #{acceptedBy}, #{acceptedAt}, #{status}, NOW())
+    <sql id="Base_Columns">
+        id, task_id, suggestion_type, summary, suggestion_json, accepted, accepted_by, accepted_at, status, create_time
+    </sql>
+
+    <insert id="insert" parameterType="com.sky.entity.AiSuggestion" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO ai_suggestion
+        (task_id, suggestion_type, summary, suggestion_json, accepted, accepted_by, accepted_at, status, create_time)
+        VALUES
+            (
+                #{taskId,jdbcType=BIGINT},
+                #{suggestionType,jdbcType=VARCHAR},
+                #{summary,jdbcType=VARCHAR},
+                #{suggestionJson,jdbcType=LONGVARCHAR},
+                #{accepted,jdbcType=TINYINT},
+                #{acceptedBy,jdbcType=BIGINT},
+                #{acceptedAt,jdbcType=TIMESTAMP},
+                #{status,jdbcType=VARCHAR},
+                NOW()
+            )
     </insert>
-
-    <select id="selectById" resultMap="BaseResultMap" parameterType="long">
-        SELECT * FROM ai_suggestion WHERE id = #{id}
-    </select>
-
-    <select id="selectByBiz" resultMap="BaseResultMap">
-        SELECT * FROM ai_suggestion WHERE biz_type = #{bizType} AND biz_id = #{bizId} ORDER BY create_time DESC
-    </select>
 
     <update id="update" parameterType="com.sky.entity.AiSuggestion">
         UPDATE ai_suggestion
-        SET task_id = #{taskId}, biz_type = #{bizType}, biz_id = #{bizId}, suggestion_type = #{suggestionType},
-            content = #{content}, accepted = #{accepted}, accepted_by = #{acceptedBy}, accepted_at = #{acceptedAt}, status = #{status}
-        WHERE id = #{id}
+        <set>
+            <if test="taskId != null">task_id = #{taskId,jdbcType=BIGINT},</if>
+            <if test="suggestionType != null">suggestion_type = #{suggestionType,jdbcType=VARCHAR},</if>
+            <if test="summary != null">summary = #{summary,jdbcType=VARCHAR},</if>
+            <if test="suggestionJson != null">suggestion_json = #{suggestionJson,jdbcType=LONGVARCHAR},</if>
+            <if test="accepted != null">accepted = #{accepted,jdbcType=TINYINT},</if>
+            <if test="acceptedBy != null">accepted_by = #{acceptedBy,jdbcType=BIGINT},</if>
+            <if test="acceptedAt != null">accepted_at = #{acceptedAt,jdbcType=TIMESTAMP},</if>
+            <if test="status != null">status = #{status,jdbcType=VARCHAR},</if>
+        </set>
+        WHERE id = #{id,jdbcType=BIGINT}
+    </update>
+
+    <select id="selectById" resultMap="AiSuggestionResultMap" parameterType="long">
+        SELECT <include refid="Base_Columns" /> FROM ai_suggestion WHERE id = #{id}
+    </select>
+
+    <select id="selectByTaskId" resultMap="AiSuggestionResultMap" parameterType="long">
+        SELECT <include refid="Base_Columns" /> FROM ai_suggestion
+        WHERE task_id = #{taskId}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByStatus" resultMap="AiSuggestionResultMap" parameterType="string">
+        SELECT <include refid="Base_Columns" /> FROM ai_suggestion
+        WHERE status = #{status}
+        ORDER BY create_time DESC
+    </select>
+
+    <update id="markAccepted">
+        UPDATE ai_suggestion
+        SET accepted = 1,
+            accepted_by = #{acceptedBy,jdbcType=BIGINT},
+            accepted_at = #{acceptedAt,jdbcType=TIMESTAMP},
+            status = 'APPLIED'
+        WHERE id = #{id,jdbcType=BIGINT}
     </update>
 
 </mapper>
